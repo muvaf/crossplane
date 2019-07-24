@@ -87,12 +87,12 @@ type ExternalClient interface {
 
 	// Create an external resource per the specifications of the supplied
 	// Managed resource.
-	Create(ctx context.Context, mg Managed) (ExternalCreation, error)
+	Create(ctx context.Context, mg Managed) (ExternalObservation, error)
 
 	// Update the external resource represented by the supplied Managed
 	// resource, if necessary. Update implementations must handle the case in
 	// which no update is necessary.
-	Update(ctx context.Context, mg Managed) (ExternalUpdate, error)
+	Update(ctx context.Context, mg Managed) (ExternalObservation, error)
 
 	// Delete the external resource upon deletion of its associated Managed
 	// resource.
@@ -116,13 +116,13 @@ func (c *NopClient) Observe(ctx context.Context, mg Managed) (ExternalObservatio
 }
 
 // Create does nothing. It returns an empty ExternalCreation and no error.
-func (c *NopClient) Create(ctx context.Context, mg Managed) (ExternalCreation, error) {
-	return ExternalCreation{}, nil
+func (c *NopClient) Create(ctx context.Context, mg Managed) (ExternalObservation, error) {
+	return ExternalObservation{}, nil
 }
 
 // Update does nothing. It returns an empty ExternalUpdate and no error.
-func (c *NopClient) Update(ctx context.Context, mg Managed) (ExternalUpdate, error) {
-	return ExternalUpdate{}, nil
+func (c *NopClient) Update(ctx context.Context, mg Managed) (ExternalObservation, error) {
+	return ExternalObservation{}, nil
 }
 
 // Delete does nothing. It never returns an error.
@@ -264,6 +264,7 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 	// Be wary of adding additional complexity.
 
 	log.V(logging.Debug).Info("Reconciling", "controller", managedControllerName, "request", req)
+	requeueAfter := r.shortWait
 
 	ctx, cancel := context.WithTimeout(context.Background(), managedReconcileTimeout)
 	defer cancel()
@@ -296,10 +297,10 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 	}
 
-	if meta.WasDeleted(managed) {
+	if observation.ResourceExists {
 		// TODO: Reclaim Policy should be used between Claim and Managed. For Managed and External Resource,
 		// we need another field.
-		if observation.ResourceExists && managed.GetReclaimPolicy() == v1alpha1.ReclaimDelete {
+		if meta.WasDeleted(managed) && managed.GetReclaimPolicy() == v1alpha1.ReclaimDelete {
 			managed.SetConditions(v1alpha1.Deleting())
 			if err := external.Delete(ctx, managed); err != nil {
 				// We'll hit this condition if we can't delete our external
@@ -311,90 +312,63 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 				managed.SetConditions(v1alpha1.ReconcileError(err))
 				return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 			}
+			managed.SetConditions(v1alpha1.ReconcileSuccess())
 		} else {
-			if err := r.managed.Finalize(ctx, managed); err != nil {
-				// If this is the first time we encounter this issue we'll be
+			observation, err = external.Update(ctx, managed)
+			if err != nil {
+				// We'll hit this condition if we can't update our external resource,
+				// for example if our provider credentials don't have access to update
+				// it. If this is the first time we encounter this issue we'll be
 				// requeued implicitly when we update our status with the new error
 				// condition. If not, we want to try again after a short wait.
+				managed.SetConditions(v1alpha1.ReconcileError(err))
+				return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
+			}
+			managed.SetConditions(v1alpha1.ReconcileSuccess())
+			// We've successfully attempted to update our external resource. This will
+			// often be a no-op. Per the below issue nothing will notify us if and when
+			// the external resource we manage changes, so we requeue a speculative
+			// reconcile after a long wait in order to observe it and react accordingly.
+			// https://github.com/crossplaneio/crossplane/issues/289
+			requeueAfter = r.longWait
+		}
+	} else {
+		if meta.WasDeleted(managed) {
+			if err := r.managed.Finalize(ctx, managed); err != nil {
 				managed.SetConditions(v1alpha1.ReconcileError(err))
 				return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(IgnoreNotFound(r.client.Status().Update(ctx, managed)), errUpdateManagedStatus)
 			}
 			// We've successfully finalized the deletion of our external and managed
 			// resources.
 			managed.SetConditions(v1alpha1.ReconcileSuccess())
+		} else {
+			if err := r.managed.Establish(ctx, managed); err != nil {
+				managed.SetConditions(v1alpha1.ReconcileError(err))
+				return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
+			}
+			observation, err = external.Create(ctx, managed)
+			if err != nil {
+				// We'll hit this condition if we can't create our external
+				// resource, for example if our provider credentials don't have
+				// access to create it. If this is the first time we encounter this
+				// issue we'll be requeued implicitly when we update our status with
+				// the new error condition. If not, we want to try again after a
+				// short wait.
+				managed.SetConditions(v1alpha1.ReconcileError(err))
+				return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
+			}
+			// We've successfully created our external resource. In many cases the
+			// creation process takes a little time to finish. We requeue a short
+			// wait in order to observe the external resource to determine whether
+			// it's ready for use.
+			managed.SetConditions(v1alpha1.ReconcileSuccess())
 		}
-		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(IgnoreNotFound(r.client.Status().Update(ctx, managed)), errUpdateManagedStatus)
 	}
-
 	if err := r.managed.Publish(ctx, managed, observation.ConnectionDetails); err != nil {
-		// If this is the first time we encounter this issue we'll be requeued
-		// implicitly when we update our status with the new error condition. If
-		// not, we want to try again after a short wait.
 		managed.SetConditions(v1alpha1.ReconcileError(err))
 		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 	}
 
-	if !observation.ResourceExists {
-		if err := r.managed.Establish(ctx, managed); err != nil {
-			// If this is the first time we encounter this issue we'll be
-			// requeued implicitly when we update our status with the new error
-			// condition. If not, we want to try again after a short wait.
-			managed.SetConditions(v1alpha1.ReconcileError(err))
-			return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-		}
-
-		creation, err := external.Create(ctx, managed)
-		if err != nil {
-			// We'll hit this condition if we can't create our external
-			// resource, for example if our provider credentials don't have
-			// access to create it. If this is the first time we encounter this
-			// issue we'll be requeued implicitly when we update our status with
-			// the new error condition. If not, we want to try again after a
-			// short wait.
-			managed.SetConditions(v1alpha1.ReconcileError(err))
-			return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-		}
-
-		if err := r.managed.Publish(ctx, managed, creation.ConnectionDetails); err != nil {
-			// If this is the first time we encounter this issue we'll be
-			// requeued implicitly when we update our status with the new error
-			// condition. If not, we want to try again after a short wait.
-			managed.SetConditions(v1alpha1.ReconcileError(err))
-			return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-		}
-
-		// We've successfully created our external resource. In many cases the
-		// creation process takes a little time to finish. We requeue a short
-		// wait in order to observe the external resource to determine whether
-		// it's ready for use.
-		managed.SetConditions(v1alpha1.ReconcileSuccess())
-		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-	}
-
-	update, err := external.Update(ctx, managed)
-	if err != nil {
-		// We'll hit this condition if we can't update our external resource,
-		// for example if our provider credentials don't have access to update
-		// it. If this is the first time we encounter this issue we'll be
-		// requeued implicitly when we update our status with the new error
-		// condition. If not, we want to try again after a short wait.
-		managed.SetConditions(v1alpha1.ReconcileError(err))
-		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-	}
-
-	if err := r.managed.Publish(ctx, managed, update.ConnectionDetails); err != nil {
-		// If this is the first time we encounter this issue we'll be requeued
-		// implicitly when we update our status with the new error condition. If
-		// not, we want to try again after a short wait.
-		managed.SetConditions(v1alpha1.ReconcileError(err))
-		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
-	}
-
-	// We've successfully attempted to update our external resource. This will
-	// often be a no-op. Per the below issue nothing will notify us if and when
-	// the external resource we manage changes, so we requeue a speculative
-	// reconcile after a long wait in order to observe it and react accordingly.
-	// https://github.com/crossplaneio/crossplane/issues/289
 	managed.SetConditions(v1alpha1.ReconcileSuccess())
-	return reconcile.Result{RequeueAfter: r.longWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
+	return reconcile.Result{RequeueAfter: requeueAfter}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 }
