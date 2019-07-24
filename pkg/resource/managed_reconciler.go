@@ -49,19 +49,25 @@ const (
 // resource, for example usernames, passwords, endpoints, ports, etc.
 type ConnectionDetails map[string][]byte
 
-// A ManagedPublisher publishes the supplied ConnectionDetails for the supplied
+// A ManagedConnectionPublisher manages the supplied ConnectionDetails for the supplied
 // Managed resource. ManagedPublishers must handle the case in which the
 // supplied ConnectionDetails are empty.
-type ManagedPublisher interface {
-	Publish(ctx context.Context, mg Managed, c ConnectionDetails) error
+type ManagedConnectionPublisher interface {
+	ApplyConnection(ctx context.Context, mg Managed, c ConnectionDetails) error
+	DeleteConnection(ctx context.Context, mg Managed, c ConnectionDetails) error
 }
 
-// A ManagedPublisherFn is a function that satisfies the ManagedPublisher interface.
-type ManagedPublisherFn func(ctx context.Context, mg Managed, c ConnectionDetails) error
+type ManagedConnectionPublisherFn struct {
+	ApplyConnectionFn  func(ctx context.Context, mg Managed, c ConnectionDetails) error
+	DeleteConnectionFn func(ctx context.Context, mg Managed, c ConnectionDetails) error
+}
 
-// Publish the supplied ConnectionDetails for the supplied Managed resource.
-func (fn ManagedPublisherFn) Publish(ctx context.Context, mg Managed, c ConnectionDetails) error {
-	return fn(ctx, mg, c)
+func (fn ManagedConnectionPublisherFn) ApplyConnection(ctx context.Context, mg Managed, c ConnectionDetails) error {
+	return fn.ApplyConnectionFn(ctx, mg, c)
+}
+
+func (fn ManagedConnectionPublisherFn) DeleteConnection(ctx context.Context, mg Managed, c ConnectionDetails) error {
+	return fn.DeleteConnectionFn(ctx, mg, c)
 }
 
 // A ManagedEstablisher establishes ownership of the supplied Managed resource.
@@ -164,16 +170,16 @@ type ManagedReconciler struct {
 }
 
 type mrManaged struct {
-	ManagedPublisher
+	ManagedConnectionPublisher
 	ManagedEstablisher
 	ManagedFinalizer
 }
 
 func defaultMRManaged(m manager.Manager) mrManaged {
 	return mrManaged{
-		ManagedPublisher:   NewAPISecretPublisher(m.GetClient(), m.GetScheme()),
-		ManagedEstablisher: NewAPIManagedFinalizerAdder(m.GetClient()),
-		ManagedFinalizer:   NewAPIManagedFinalizerRemover(m.GetClient()),
+		ManagedConnectionPublisher: NewAPISecretPublisher(m.GetClient(), m.GetScheme()),
+		ManagedEstablisher:         NewAPIManagedFinalizerAdder(m.GetClient()),
+		ManagedFinalizer:           NewAPIManagedFinalizerRemover(m.GetClient()),
 	}
 }
 
@@ -221,9 +227,9 @@ func WithExternalConnecter(c ExternalConnecter) ManagedReconcilerOption {
 
 // WithManagedPublishers specifies how the Reconciler should publish its
 // connection details such as credentials and endpoints.
-func WithManagedPublishers(p ...ManagedPublisher) ManagedReconcilerOption {
+func WithManagedConnectionPublishers(p ...ManagedConnectionPublisher) ManagedReconcilerOption {
 	return func(r *ManagedReconciler) {
-		r.managed.ManagedPublisher = PublisherChain(p)
+		r.managed.ManagedConnectionPublisher = PublisherChain(p)
 	}
 }
 
@@ -323,7 +329,7 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(IgnoreNotFound(r.client.Status().Update(ctx, managed)), errUpdateManagedStatus)
 	}
 
-	if err := r.managed.Publish(ctx, managed, observation.ConnectionDetails); err != nil {
+	if err := r.managed.ApplyConnection(ctx, managed, observation.ConnectionDetails); err != nil {
 		// If this is the first time we encounter this issue we'll be requeued
 		// implicitly when we update our status with the new error condition. If
 		// not, we want to try again after a short wait.
@@ -352,7 +358,7 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 			return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 		}
 
-		if err := r.managed.Publish(ctx, managed, creation.ConnectionDetails); err != nil {
+		if err := r.managed.ApplyConnection(ctx, managed, creation.ConnectionDetails); err != nil {
 			// If this is the first time we encounter this issue we'll be
 			// requeued implicitly when we update our status with the new error
 			// condition. If not, we want to try again after a short wait.
@@ -379,7 +385,7 @@ func (r *ManagedReconciler) Reconcile(req reconcile.Request) (reconcile.Result, 
 		return reconcile.Result{RequeueAfter: r.shortWait}, errors.Wrap(r.client.Status().Update(ctx, managed), errUpdateManagedStatus)
 	}
 
-	if err := r.managed.Publish(ctx, managed, update.ConnectionDetails); err != nil {
+	if err := r.managed.ApplyConnection(ctx, managed, update.ConnectionDetails); err != nil {
 		// If this is the first time we encounter this issue we'll be requeued
 		// implicitly when we update our status with the new error condition. If
 		// not, we want to try again after a short wait.
