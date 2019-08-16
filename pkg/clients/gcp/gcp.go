@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"google.golang.org/api/option"
 
 	"golang.org/x/oauth2"
@@ -102,9 +104,9 @@ func IsErrorBadRequest(err error) bool {
 }
 
 // ProviderCredentials return google credentials based on the provider's credentials secret data
-func ProviderCredentials(client kubernetes.Interface, p *gcpv1alpha1.Provider, scopes ...string) (*google.Credentials, error) {
+func ProviderCredentials(client client.Client, p *gcpv1alpha1.Provider, scopes ...string) (*google.Credentials, error) {
 	// retrieve provider secret data
-	data, err := util.SecretData(client, p.Namespace, p.Spec.Secret)
+	data, err := util.GetDataFromSecret(client, p.Namespace, p.Spec.Secret)
 	if err != nil {
 		return nil, err
 	}

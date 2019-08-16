@@ -29,7 +29,7 @@ import (
 type Controllers struct{}
 
 // SetupWithManager adds all GCP controllers to the manager.
-func (c *Controllers) SetupWithManager(mgr ctrl.Manager) error {
+func (c *Controllers) SetupWithManager(mgr ctrl.Manager) error { // nolint:gocyclo
 	if err := (&cache.CloudMemorystoreInstanceClaimController{}).SetupWithManager(mgr); err != nil {
 		return err
 	}
@@ -43,6 +43,10 @@ func (c *Controllers) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	if err := (&compute.GKEClusterController{}).SetupWithManager(mgr); err != nil {
+		return err
+	}
+
+	if err := (&compute.NetworkController{}).SetupWithManager(mgr); err != nil {
 		return err
 	}
 
