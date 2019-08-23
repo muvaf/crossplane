@@ -19,8 +19,9 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
 	"net/http"
+
+	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

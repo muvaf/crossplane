@@ -13,7 +13,7 @@ spec:
   scope: ""
   validation:
     openAPIV3Schema:
-      description: Network is the Schema for the examplekinds API
+      description: Network is the Schema for the GCP Network API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -146,8 +146,9 @@ spec:
                 resources when their bound resource claims are deleted.
               type: string
             specForProvider:
-              description: GCPNetwork is the mirror of googlecompute.Network but with
-                deepcopy functions. In the future, this can be generated automatically.
+              description: GCPNetworkSpec contains fields of googlecompute.Network
+                object that are configurable by the user, i.e. the ones that are not
+                marked as [Output Only] In the future, this can be generated automatically.
               properties:
                 IPv4Range:
                   description: 'IPv4Range: Deprecated in favor of subnet mode networks.
@@ -162,26 +163,9 @@ spec:
                     with one subnet per region. Each subnet has a predetermined range
                     as described in Auto mode VPC network IP ranges."
                   type: boolean
-                creationTimestamp:
-                  description: 'CreationTimestamp: [Output Only] Creation timestamp
-                    in RFC3339 text format.'
-                  type: string
                 description:
                   description: 'Description: An optional description of this resource.
                     Provide this field when you create the resource.'
-                  type: string
-                gatewayIPv4:
-                  description: 'GatewayIPv4: [Output Only] The gateway address for
-                    default routing out of the network, selected by GCP.'
-                  type: string
-                id:
-                  description: 'Id: [Output Only] The unique identifier for the resource.
-                    This identifier is defined by the server.'
-                  format: int64
-                  type: integer
-                kind:
-                  description: 'Kind: [Output Only] Type of the resource. Always compute#network
-                    for networks.'
                   type: string
                 name:
                   description: 'Name: Name of the resource. Provided by the client
@@ -193,58 +177,6 @@ spec:
                     letter, or digit. The last character must be a lowercase letter
                     or digit.'
                   type: string
-                peerings:
-                  description: 'Peerings: [Output Only] A list of network peerings
-                    for the resource.'
-                  items:
-                    description: GCPNetworkPeering is the mirror of googlecompute.NetworkPeering
-                      but with deepcopy functions.
-                    properties:
-                      autoCreateRoutes:
-                        description: 'AutoCreateRoutes: This field will be deprecated
-                          soon. Use the exchange_subnet_routes field instead. Indicates
-                          whether full mesh connectivity is created and managed automatically
-                          between peered networks. Currently this field should always
-                          be true since Google Compute Engine will automatically create
-                          and manage subnetwork routes between two networks when peering
-                          state is ACTIVE.'
-                        type: boolean
-                      exchangeSubnetRoutes:
-                        description: 'ExchangeSubnetRoutes: Indicates whether full
-                          mesh connectivity is created and managed automatically between
-                          peered networks. Currently this field should always be true
-                          since Google Compute Engine will automatically create and
-                          manage subnetwork routes between two networks when peering
-                          state is ACTIVE.'
-                        type: boolean
-                      name:
-                        description: 'Name: Name of this peering. Provided by the
-                          client when the peering is created. The name must comply
-                          with RFC1035. Specifically, the name must be 1-63 characters
-                          long and match regular expression `[a-z]([-a-z0-9]*[a-z0-9])?`.
-                          The first character must be a lowercase letter, and all
-                          the following characters must be a dash, lowercase letter,
-                          or digit, except the last character, which cannot be a dash.'
-                        type: string
-                      network:
-                        description: 'Network: The URL of the peer network. It can
-                          be either full URL or partial URL. The peer network may
-                          belong to a different project. If the partial URL does not
-                          contain project, it is assumed that the peer network is
-                          in the same project as the current network.'
-                        type: string
-                      state:
-                        description: "State: [Output Only] State for the peering,
-                          either `ACTIVE` or `INACTIVE`. The peering is `ACTIVE` when
-                          there's a matching configuration in the peer network. \n
-                          Possible values:   \"ACTIVE\"   \"INACTIVE\""
-                        type: string
-                      stateDetails:
-                        description: 'StateDetails: [Output Only] Details about the
-                          current state of the peering.'
-                        type: string
-                    type: object
-                  type: array
                 routingConfig:
                   description: 'RoutingConfig: The network-level routing configuration
                     for this network. Used by Cloud Router to determine what type
@@ -260,16 +192,6 @@ spec:
                         \  \"REGIONAL\""
                       type: string
                   type: object
-                selfLink:
-                  description: 'SelfLink: [Output Only] Server-defined URL for the
-                    resource.'
-                  type: string
-                subnetworks:
-                  description: 'Subnetworks: [Output Only] Server-defined fully-qualified
-                    URLs for all subnetworks in this VPC network.'
-                  items:
-                    type: string
-                  type: array
               type: object
             writeConnectionSecretToRef:
               description: LocalObjectReference contains enough information to let
@@ -327,8 +249,9 @@ spec:
                 type: object
               type: array
             statusAtProvider:
-              description: GCPNetwork is the mirror of googlecompute.Network but with
-                deepcopy functions. In the future, this can be generated automatically.
+              description: GCPNetworkStatus is the complete mirror of googlecompute.Network
+                but with deepcopy functions. In the future, this can be generated
+                automatically.
               properties:
                 IPv4Range:
                   description: 'IPv4Range: Deprecated in favor of subnet mode networks.

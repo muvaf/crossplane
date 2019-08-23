@@ -29,18 +29,18 @@ import (
 // NetworkSpec defines the desired state of Network
 type NetworkSpec struct {
 	v1alpha1.ResourceSpec `json:",inline"`
-	SpecForProvider       *GCPNetwork `json:"specForProvider,omitempty"`
+	SpecForProvider       *GCPNetworkSpec `json:"specForProvider,omitempty"`
 }
 
 // NetworkStatus defines the observed state of Network
 type NetworkStatus struct {
 	v1alpha1.ResourceStatus `json:",inline"`
-	StatusAtProvider        *GCPNetwork `json:"statusAtProvider,omitempty"`
+	StatusAtProvider        *GCPNetworkStatus `json:"statusAtProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// Network is the Schema for the examplekinds API
+// Network is the Schema for the GCP Network API
 type Network struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -113,13 +113,47 @@ type NetworkList struct {
 	Items           []Network `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&Network{}, &NetworkList{})
+// GCPNetworkSpec contains fields of googlecompute.Network object that are
+// configurable by the user, i.e. the ones that are not marked as [Output Only]
+// In the future, this can be generated automatically.
+type GCPNetworkSpec struct {
+	// IPv4Range: Deprecated in favor of subnet mode networks. The range of
+	// internal addresses that are legal on this network. This range is a
+	// CIDR specification, for example: 192.168.0.0/16. Provided by the
+	// client when the network is created.
+	IPv4Range string `json:"IPv4Range,omitempty"`
+
+	// AutoCreateSubnetworks: When set to true, the VPC network is created
+	// in "auto" mode. When set to false, the VPC network is created in
+	// "custom" mode.
+	//
+	// An auto mode VPC network starts with one subnet per region. Each
+	// subnet has a predetermined range as described in Auto mode VPC
+	// network IP ranges.
+	AutoCreateSubnetworks bool `json:"autoCreateSubnetworks,omitempty"`
+
+	// Description: An optional description of this resource. Provide this
+	// field when you create the resource.
+	Description string `json:"description,omitempty"`
+
+	// Name: Name of the resource. Provided by the client when the resource
+	// is created. The name must be 1-63 characters long, and comply with
+	// RFC1035. Specifically, the name must be 1-63 characters long and
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?. The first
+	// character must be a lowercase letter, and all following characters
+	// (except for the last character) must be a dash, lowercase letter, or
+	// digit. The last character must be a lowercase letter or digit.
+	Name string `json:"name,omitempty"`
+
+	// RoutingConfig: The network-level routing configuration for this
+	// network. Used by Cloud Router to determine what type of network-wide
+	// routing behavior to enforce.
+	RoutingConfig *GCPNetworkRoutingConfig `json:"routingConfig,omitempty"`
 }
 
-// GCPNetwork is the mirror of googlecompute.Network but with deepcopy functions.
-// In the future, this can be generated automatically.
-type GCPNetwork struct {
+// GCPNetworkStatus is the complete mirror of googlecompute.Network but
+// with deepcopy functions. In the future, this can be generated automatically.
+type GCPNetworkStatus struct {
 	// IPv4Range: Deprecated in favor of subnet mode networks. The range of
 	// internal addresses that are legal on this network. This range is a
 	// CIDR specification, for example: 192.168.0.0/16. Provided by the
@@ -200,10 +234,10 @@ type GCPNetwork struct {
 	NullFields []string `json:"-"`
 }
 
-// GenerateNetwork takes a *GCPNetwork and returns *googlecompute.Network.
+// GenerateGCPNetworkSpec takes a *GCPNetworkStatus and returns *googlecompute.Network.
 // It assigns only the fields that are writable, i.e. not labelled as [Output Only]
 // in Google's reference.
-func GenerateNetwork(in *GCPNetwork) *googlecompute.Network {
+func GenerateGCPNetworkSpec(in *GCPNetworkSpec) *googlecompute.Network {
 	n := &googlecompute.Network{}
 	n.IPv4Range = in.IPv4Range
 	n.AutoCreateSubnetworks = in.AutoCreateSubnetworks
@@ -217,10 +251,10 @@ func GenerateNetwork(in *GCPNetwork) *googlecompute.Network {
 	return n
 }
 
-// GenerateGCPNetwork takes a *googlecompute.Network and returns *GCPNetwork
+// GenerateGCPNetworkStatus takes a *googlecompute.Network and returns *GCPNetworkStatus
 // It assings all the fields.
-func GenerateGCPNetwork(in *googlecompute.Network) *GCPNetwork {
-	gn := &GCPNetwork{
+func GenerateGCPNetworkStatus(in *googlecompute.Network) *GCPNetworkStatus {
+	gn := &GCPNetworkStatus{
 		IPv4Range:             in.IPv4Range,
 		AutoCreateSubnetworks: in.AutoCreateSubnetworks,
 		CreationTimestamp:     in.CreationTimestamp,

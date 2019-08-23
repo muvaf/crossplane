@@ -119,7 +119,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (resource.E
 	if err != nil {
 		return resource.ExternalObservation{}, err
 	}
-	cr.Status.StatusAtProvider = computev1alpha1.GenerateGCPNetwork(observed)
+	cr.Status.StatusAtProvider = computev1alpha1.GenerateGCPNetworkStatus(observed)
 	return resource.ExternalObservation{
 		ResourceExists: true,
 	}, nil
@@ -131,14 +131,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (resource.Ex
 		return resource.ExternalCreation{}, errors.New(errNotVPC)
 	}
 	if cr.Spec.SpecForProvider == nil {
-		cr.Spec.SpecForProvider = &computev1alpha1.GCPNetwork{}
+		cr.Spec.SpecForProvider = &computev1alpha1.GCPNetworkSpec{}
 	}
 	if cr.Spec.SpecForProvider.Name == "" {
 		cr.Spec.SpecForProvider.Name = fmt.Sprintf("%s-%s", namePrefix, string(cr.ObjectMeta.UID))
 	}
 	call := c.networksService.Insert(
 		c.projectID,
-		computev1alpha1.GenerateNetwork(cr.Spec.SpecForProvider))
+		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider))
 	if _, err := call.Do(); err != nil {
 		return resource.ExternalCreation{}, err
 	}
@@ -153,7 +153,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (resource.Ex
 	call := c.networksService.Patch(
 		c.projectID,
 		cr.Spec.SpecForProvider.Name,
-		computev1alpha1.GenerateNetwork(cr.Spec.SpecForProvider))
+		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider))
 	if _, err := call.Do(); err != nil {
 		return resource.ExternalUpdate{}, err
 	}
@@ -166,7 +166,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotVPC)
 	}
 	call := c.networksService.Delete(c.projectID, cr.Spec.SpecForProvider.Name)
-	if _, err := call.Do(); err != nil {
+	if _, err := call.Do(); !gcpclients.IsErrorNotFound(err) && err != nil {
 		return err
 	}
 	return nil
