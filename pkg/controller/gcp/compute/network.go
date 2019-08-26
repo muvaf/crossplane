@@ -29,11 +29,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
+	"github.com/crossplaneio/crossplane-runtime/pkg/resource"
 	computev1alpha1 "github.com/crossplaneio/crossplane/gcp/apis/compute/v1alpha1"
 	gcpapis "github.com/crossplaneio/crossplane/gcp/apis/v1alpha1"
 	gcpclients "github.com/crossplaneio/crossplane/pkg/clients/gcp"
-	"github.com/crossplaneio/crossplane/pkg/meta"
-	"github.com/crossplaneio/crossplane/pkg/resource"
 )
 
 const (

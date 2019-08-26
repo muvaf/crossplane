@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
 	"net/http"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -105,10 +106,17 @@ func IsErrorBadRequest(err error) bool {
 
 // ProviderCredentials return google credentials based on the provider's credentials secret data
 func ProviderCredentials(client client.Client, p *gcpv1alpha1.Provider, scopes ...string) (*google.Credentials, error) {
-	// retrieve provider secret data
-	data, err := util.GetDataFromSecret(client, p.Namespace, p.Spec.Secret)
-	if err != nil {
+	secret := &v1.Secret{}
+	name := meta.NamespacedNameOf(&v1.ObjectReference{
+		Name:      p.Spec.Secret.Name,
+		Namespace: p.Namespace,
+	})
+	if err := client.Get(context.TODO(), name, secret); err != nil {
 		return nil, err
+	}
+	data, ok := secret.Data[p.Spec.Secret.Key]
+	if !ok {
+		return nil, fmt.Errorf("secret data is not found for key [%s]", p.Spec.Secret.Key)
 	}
 
 	return google.CredentialsFromJSON(context.Background(), data, scopes...)
