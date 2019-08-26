@@ -52,7 +52,8 @@ type NetworkController struct{}
 func (c *NetworkController) SetupWithManager(mgr ctrl.Manager) error {
 	r := resource.NewManagedReconciler(mgr,
 		resource.ManagedKind(computev1alpha1.NetworkGroupVersionKind),
-		resource.WithExternalConnecter(&connector{client: mgr.GetClient()}))
+		resource.WithExternalConnecter(&connector{client: mgr.GetClient()}),
+		resource.WithManagedConnectionPublishers())
 
 	name := strings.ToLower(fmt.Sprintf("%s.%s", computev1alpha1.NetworkKindAPIVersion, computev1alpha1.Group))
 

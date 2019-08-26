@@ -39,6 +39,7 @@ type NetworkStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // Network is the Schema for the GCP Network API
 type Network struct {
