@@ -44,14 +44,14 @@ import (
 )
 
 const (
-	namespace    = "default"
-	providerName = "test-provider"
-	clusterName  = "test-cluster"
+	testNamespace = "default"
+	providerName  = "test-provider"
+	clusterName   = "test-cluster"
 )
 
 var (
 	key = types.NamespacedName{
-		Namespace: namespace,
+		Namespace: testNamespace,
 		Name:      clusterName,
 	}
 	request = reconcile.Request{
@@ -75,11 +75,11 @@ func testCluster() *GKECluster {
 	return &GKECluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
-			Namespace: namespace,
+			Namespace: testNamespace,
 		},
 		Spec: GKEClusterSpec{
 			ResourceSpec: runtimev1alpha1.ResourceSpec{
-				ProviderReference: &corev1.ObjectReference{Namespace: namespace, Name: providerName},
+				ProviderReference: &corev1.ObjectReference{Namespace: testNamespace, Name: providerName},
 			},
 		},
 	}

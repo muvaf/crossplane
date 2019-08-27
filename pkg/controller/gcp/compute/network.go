@@ -61,6 +61,13 @@ func (c *NetworkController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+type networksService interface {
+	Get(project string, network string) *googlecompute.NetworksGetCall
+	Insert(project string, network *googlecompute.Network) *googlecompute.NetworksInsertCall
+	Patch(project string, network string, network2 *googlecompute.Network) *googlecompute.NetworksPatchCall
+	Delete(project string, network string) *googlecompute.NetworksDeleteCall
+}
+
 type connector struct {
 	client      client.Client
 	newClientFn func(ctx context.Context, opts ...option.ClientOption) (*googlecompute.Service, error)
@@ -100,7 +107,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (resource.
 }
 
 type external struct {
-	networks  *googlecompute.NetworksService
+	networks  networksService
 	projectID string
 }
 
