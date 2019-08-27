@@ -29,13 +29,13 @@ import (
 // NetworkSpec defines the desired state of Network
 type NetworkSpec struct {
 	v1alpha1.ResourceSpec `json:",inline"`
-	SpecForProvider       *GCPNetworkSpec `json:"specForProvider,omitempty"`
+	GCPNetworkSpec        `json:",inline"`
 }
 
 // NetworkStatus defines the observed state of Network
 type NetworkStatus struct {
 	v1alpha1.ResourceStatus `json:",inline"`
-	StatusAtProvider        *GCPNetworkStatus `json:"statusAtProvider,omitempty"`
+	GCPNetworkStatus        `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
@@ -238,7 +238,7 @@ type GCPNetworkStatus struct {
 // GenerateGCPNetworkSpec takes a *GCPNetworkStatus and returns *googlecompute.Network.
 // It assigns only the fields that are writable, i.e. not labelled as [Output Only]
 // in Google's reference.
-func GenerateGCPNetworkSpec(in *GCPNetworkSpec) *googlecompute.Network {
+func GenerateGCPNetworkSpec(in GCPNetworkSpec) *googlecompute.Network {
 	n := &googlecompute.Network{}
 	n.IPv4Range = in.IPv4Range
 	n.AutoCreateSubnetworks = in.AutoCreateSubnetworks
@@ -254,7 +254,7 @@ func GenerateGCPNetworkSpec(in *GCPNetworkSpec) *googlecompute.Network {
 
 // GenerateGCPNetworkStatus takes a *googlecompute.Network and returns *GCPNetworkStatus
 // It assings all the fields.
-func GenerateGCPNetworkStatus(in *googlecompute.Network) *GCPNetworkStatus {
+func GenerateGCPNetworkStatus(in googlecompute.Network) *GCPNetworkStatus {
 	gn := &GCPNetworkStatus{
 		IPv4Range:             in.IPv4Range,
 		AutoCreateSubnetworks: in.AutoCreateSubnetworks,

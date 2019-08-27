@@ -75,7 +75,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (resource.
 	// such as this. Setting it directly here does not work since managed reconciler issues updates only to
 	// `status` subresource. We require name to be given until we have a pre-process hook like configurator in Claim
 	// reconciler
-	if cr.Spec.SpecForProvider == nil || cr.Spec.SpecForProvider.Name == "" {
+	if cr.Spec.Name == "" {
 		return nil, errors.New(errNameNotGiven)
 	}
 
@@ -109,7 +109,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (resource.E
 	if !ok {
 		return resource.ExternalObservation{}, errors.New(errNotVPC)
 	}
-	observed, err := c.networks.Get(c.projectID, cr.Spec.SpecForProvider.Name).Context(ctx).Do()
+	observed, err := c.networks.Get(c.projectID, cr.Spec.Name).Context(ctx).Do()
 	if gcpclients.IsErrorNotFound(err) {
 		return resource.ExternalObservation{
 			ResourceExists: false,
@@ -118,7 +118,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (resource.E
 	if err != nil {
 		return resource.ExternalObservation{}, err
 	}
-	cr.Status.StatusAtProvider = computev1alpha1.GenerateGCPNetworkStatus(observed)
+	cr.Status.GCPNetworkStatus = *computev1alpha1.GenerateGCPNetworkStatus(*observed)
 	return resource.ExternalObservation{
 		ResourceExists: true,
 	}, nil
@@ -129,7 +129,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (resource.Ex
 	if !ok {
 		return resource.ExternalCreation{}, errors.New(errNotVPC)
 	}
-	if _, err := c.networks.Insert(c.projectID, computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider)).
+	if _, err := c.networks.Insert(c.projectID, computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.GCPNetworkSpec)).
 		Context(ctx).
 		Do(); err != nil {
 		return resource.ExternalCreation{}, err
@@ -144,8 +144,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (resource.Ex
 	}
 	if _, err := c.networks.Patch(
 		c.projectID,
-		cr.Spec.SpecForProvider.Name,
-		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider)).
+		cr.Spec.Name,
+		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.GCPNetworkSpec)).
 		Context(ctx).
 		Do(); err != nil {
 		return resource.ExternalUpdate{}, err
@@ -158,7 +158,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotVPC)
 	}
-	if _, err := c.networks.Delete(c.projectID, cr.Spec.SpecForProvider.Name).
+	if _, err := c.networks.Delete(c.projectID, cr.Spec.Name).
 		Context(ctx).
 		Do(); !gcpclients.IsErrorNotFound(err) && err != nil {
 		return err
