@@ -51,58 +51,58 @@ type Network struct {
 }
 
 // SetBindingPhase of this ReplicationGroup.
-func (rg *Network) SetBindingPhase(p v1alpha1.BindingPhase) {
-	rg.Status.SetBindingPhase(p)
+func (n *Network) SetBindingPhase(p v1alpha1.BindingPhase) {
+	n.Status.SetBindingPhase(p)
 }
 
 // SetConditions of this ReplicationGroup.
-func (rg *Network) SetConditions(c ...v1alpha1.Condition) {
-	rg.Status.SetConditions(c...)
+func (n *Network) SetConditions(c ...v1alpha1.Condition) {
+	n.Status.SetConditions(c...)
 }
 
 // GetBindingPhase of this ReplicationGroup.
-func (rg *Network) GetBindingPhase() v1alpha1.BindingPhase {
-	return rg.Status.GetBindingPhase()
+func (n *Network) GetBindingPhase() v1alpha1.BindingPhase {
+	return n.Status.GetBindingPhase()
 }
 
 // SetClaimReference of this ReplicationGroup.
-func (rg *Network) SetClaimReference(r *corev1.ObjectReference) {
-	rg.Spec.ClaimReference = r
+func (n *Network) SetClaimReference(r *corev1.ObjectReference) {
+	n.Spec.ClaimReference = r
 }
 
 // GetClaimReference of this ReplicationGroup.
-func (rg *Network) GetClaimReference() *corev1.ObjectReference {
-	return rg.Spec.ClaimReference
+func (n *Network) GetClaimReference() *corev1.ObjectReference {
+	return n.Spec.ClaimReference
 }
 
 // SetClassReference of this ReplicationGroup.
-func (rg *Network) SetClassReference(r *corev1.ObjectReference) {
-	rg.Spec.ClassReference = r
+func (n *Network) SetClassReference(r *corev1.ObjectReference) {
+	n.Spec.ClassReference = r
 }
 
 // GetClassReference of this ReplicationGroup.
-func (rg *Network) GetClassReference() *corev1.ObjectReference {
-	return rg.Spec.ClassReference
+func (n *Network) GetClassReference() *corev1.ObjectReference {
+	return n.Spec.ClassReference
 }
 
 // SetWriteConnectionSecretToReference of this ReplicationGroup.
-func (rg *Network) SetWriteConnectionSecretToReference(r corev1.LocalObjectReference) {
-	rg.Spec.WriteConnectionSecretToReference = r
+func (n *Network) SetWriteConnectionSecretToReference(r corev1.LocalObjectReference) {
+	n.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetWriteConnectionSecretToReference of this ReplicationGroup.
-func (rg *Network) GetWriteConnectionSecretToReference() corev1.LocalObjectReference {
-	return rg.Spec.WriteConnectionSecretToReference
+func (n *Network) GetWriteConnectionSecretToReference() corev1.LocalObjectReference {
+	return n.Spec.WriteConnectionSecretToReference
 }
 
 // GetReclaimPolicy of this ReplicationGroup.
-func (rg *Network) GetReclaimPolicy() v1alpha1.ReclaimPolicy {
-	return rg.Spec.ReclaimPolicy
+func (n *Network) GetReclaimPolicy() v1alpha1.ReclaimPolicy {
+	return n.Spec.ReclaimPolicy
 }
 
 // SetReclaimPolicy of this ReplicationGroup.
-func (rg *Network) SetReclaimPolicy(p v1alpha1.ReclaimPolicy) {
-	rg.Spec.ReclaimPolicy = p
+func (n *Network) SetReclaimPolicy(p v1alpha1.ReclaimPolicy) {
+	n.Spec.ReclaimPolicy = p
 }
 
 // +kubebuilder:object:root=true

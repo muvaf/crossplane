@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/crossplaneio/crossplane/gcp/apis/compute/v1alpha1"
-
 	"github.com/pkg/errors"
 	googlecompute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
@@ -31,6 +29,7 @@ import (
 
 	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
 	"github.com/crossplaneio/crossplane-runtime/pkg/resource"
+	"github.com/crossplaneio/crossplane/gcp/apis/compute/v1alpha1"
 	computev1alpha1 "github.com/crossplaneio/crossplane/gcp/apis/compute/v1alpha1"
 	gcpapis "github.com/crossplaneio/crossplane/gcp/apis/v1alpha1"
 	gcpclients "github.com/crossplaneio/crossplane/pkg/clients/gcp"
@@ -38,10 +37,9 @@ import (
 
 const (
 	// Error strings.
-	errNewClient = "cannot create new Compute Service"
-	errNotVPC    = "managed resource is not a Network resource"
-
-	namePrefix = "vpc"
+	errNewClient    = "cannot create new Compute Service"
+	errNotVPC       = "managed resource is not a Network resource"
+	errNameNotGiven = "name for external resource is not provided"
 )
 
 // NetworkController is the controller for Network CRD.
@@ -73,6 +71,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (resource.
 	if !ok {
 		return nil, errors.New(errNotVPC)
 	}
+	// TODO(muvaf): we do not yet have a way for configure the Spec with defaults for statically provisioned resources
+	// such as this. Setting it directly here does not work since managed reconciler issues updates only to
+	// `status` subresource. We require name to be given until we have a pre-process hook like configurator in Claim
+	// reconciler
+	if cr.Spec.SpecForProvider == nil || cr.Spec.SpecForProvider.Name == "" {
+		return nil, errors.New(errNameNotGiven)
+	}
 
 	provider := &gcpapis.Provider{}
 	n := meta.NamespacedNameOf(cr.Spec.ProviderReference)
@@ -80,24 +85,23 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (resource.
 		return nil, errors.Wrapf(err, "cannot get provider %s", n)
 	}
 
-	gcpCreds, err := gcpclients.ProviderCredentials(c.client, provider)
+	gcpCreds, err := gcpclients.ProviderCredentials(c.client, provider, googlecompute.ComputeScope)
 	if err != nil {
 		return nil, err
 	}
 	if c.newClientFn == nil {
 		c.newClientFn = googlecompute.NewService
 	}
-	// NOTE(muvaf): when using option.WithCredentials(), scopes are not set at all, even if passed explicitly.
-	s, err := c.newClientFn(ctx, option.WithCredentialsJSON(gcpCreds.JSON), option.WithScopes(googlecompute.ComputeScope))
+	s, err := c.newClientFn(ctx, option.WithCredentials(gcpCreds))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
-	return &external{networksService: s.Networks, projectID: provider.Spec.ProjectID}, nil
+	return &external{networks: s.Networks, projectID: provider.Spec.ProjectID}, nil
 }
 
 type external struct {
-	networksService *googlecompute.NetworksService
-	projectID       string
+	networks  *googlecompute.NetworksService
+	projectID string
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (resource.ExternalObservation, error) {
@@ -105,13 +109,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (resource.E
 	if !ok {
 		return resource.ExternalObservation{}, errors.New(errNotVPC)
 	}
-	if cr.Spec.SpecForProvider == nil || cr.Spec.SpecForProvider.Name == "" {
-		return resource.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
-	call := c.networksService.Get(c.projectID, cr.Spec.SpecForProvider.Name)
-	observed, err := call.Do()
+	observed, err := c.networks.Get(c.projectID, cr.Spec.SpecForProvider.Name).Context(ctx).Do()
 	if gcpclients.IsErrorNotFound(err) {
 		return resource.ExternalObservation{
 			ResourceExists: false,
@@ -131,16 +129,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (resource.Ex
 	if !ok {
 		return resource.ExternalCreation{}, errors.New(errNotVPC)
 	}
-	if cr.Spec.SpecForProvider == nil {
-		cr.Spec.SpecForProvider = &computev1alpha1.GCPNetworkSpec{}
-	}
-	if cr.Spec.SpecForProvider.Name == "" {
-		cr.Spec.SpecForProvider.Name = fmt.Sprintf("%s-%s", namePrefix, string(cr.ObjectMeta.UID))
-	}
-	call := c.networksService.Insert(
-		c.projectID,
-		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider))
-	if _, err := call.Do(); err != nil {
+	if _, err := c.networks.Insert(c.projectID, computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider)).
+		Context(ctx).
+		Do(); err != nil {
 		return resource.ExternalCreation{}, err
 	}
 	return resource.ExternalCreation{}, nil
@@ -151,11 +142,12 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (resource.Ex
 	if !ok {
 		return resource.ExternalUpdate{}, errors.New(errNotVPC)
 	}
-	call := c.networksService.Patch(
+	if _, err := c.networks.Patch(
 		c.projectID,
 		cr.Spec.SpecForProvider.Name,
-		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider))
-	if _, err := call.Do(); err != nil {
+		computev1alpha1.GenerateGCPNetworkSpec(cr.Spec.SpecForProvider)).
+		Context(ctx).
+		Do(); err != nil {
 		return resource.ExternalUpdate{}, err
 	}
 	return resource.ExternalUpdate{}, nil
@@ -166,8 +158,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotVPC)
 	}
-	call := c.networksService.Delete(c.projectID, cr.Spec.SpecForProvider.Name)
-	if _, err := call.Do(); !gcpclients.IsErrorNotFound(err) && err != nil {
+	if _, err := c.networks.Delete(c.projectID, cr.Spec.SpecForProvider.Name).
+		Context(ctx).
+		Do(); !gcpclients.IsErrorNotFound(err) && err != nil {
 		return err
 	}
 	return nil
