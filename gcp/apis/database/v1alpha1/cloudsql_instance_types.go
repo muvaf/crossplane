@@ -45,6 +45,12 @@ const (
 
 	PasswordLength   = 20
 	DefaultStorageGB = 10
+
+	PrivateIPType = "PRIVATE"
+	PublicIPType  = "PRIMARY"
+
+	PrivateIPKey = "privateIP"
+	PublicIPKey  = "publicIP"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -86,8 +92,10 @@ type CloudsqlInstanceSpec struct {
 type CloudsqlInstanceStatus struct {
 	runtimev1alpha1.ResourceStatus `json:",inline"`
 
-	State    string `json:"state,omitempty"`
-	Endpoint string `json:"endpoint,omitempty"`
+	State string `json:"state,omitempty"`
+	// TODO(muvaf): Convert these types to *string during managed reconciler refactor because both are optional.
+	PublicIP  string `json:"publicIp,omitempty"`
+	PrivateIP string `json:"privateIp,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -179,7 +187,8 @@ type CloudsqlInstanceList struct {
 // ConnectionSecret returns a connection secret for this instance
 func (i *CloudsqlInstance) ConnectionSecret() *corev1.Secret {
 	s := resource.ConnectionSecretFor(i, CloudsqlInstanceGroupVersionKind)
-	s.Data[runtimev1alpha1.ResourceCredentialsSecretEndpointKey] = []byte(i.Status.Endpoint)
+	s.Data[PublicIPKey] = []byte(i.Status.PublicIP)
+	s.Data[PrivateIPKey] = []byte(i.Status.PrivateIP)
 	s.Data[runtimev1alpha1.ResourceCredentialsSecretUserKey] = []byte(i.DatabaseUserName())
 	return s
 }
@@ -260,9 +269,15 @@ func (i *CloudsqlInstance) SetStatus(inst *sqladmin.DatabaseInstance) {
 	} else {
 		i.Status.SetConditions(runtimev1alpha1.Unavailable())
 	}
-
-	if len(inst.IpAddresses) > 0 {
-		i.Status.Endpoint = inst.IpAddresses[0].IpAddress
+	// TODO(muvaf): There might be cases where more than 1 private and/or public IP address has been assigned. We should
+	// somehow show all addresses that are possible to use.
+	for _, mapping := range inst.IpAddresses {
+		switch mapping.Type {
+		case PrivateIPType:
+			i.Status.PrivateIP = mapping.IpAddress
+		case PublicIPType:
+			i.Status.PublicIP = mapping.IpAddress
+		}
 	}
 }
 

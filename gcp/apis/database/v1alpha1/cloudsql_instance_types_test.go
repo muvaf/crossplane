@@ -98,8 +98,9 @@ func TestCloudsqlInstance_ConnectionSecret(t *testing.T) {
 				},
 			},
 			want: map[string][]byte{
-				runtimev1alpha1.ResourceCredentialsSecretEndpointKey: []byte(""),
-				runtimev1alpha1.ResourceCredentialsSecretUserKey:     []byte(PostgresqlDefaultUser),
+				PublicIPKey:  []byte(""),
+				PrivateIPKey: []byte(""),
+				runtimev1alpha1.ResourceCredentialsSecretUserKey: []byte(PostgresqlDefaultUser),
 			},
 		},
 	}
@@ -354,6 +355,7 @@ func TestCloudsqlInstance_SetStatus(t *testing.T) {
 				IpAddresses: []*sqladmin.IpMapping{
 					{
 						IpAddress: "foo",
+						Type:      PublicIPType,
 					},
 				},
 				State: StateRunnable,
@@ -373,7 +375,7 @@ func TestCloudsqlInstance_SetStatus(t *testing.T) {
 						Phase: runtimev1alpha1.BindingPhaseUnbound,
 					},
 				},
-				Endpoint: "foo",
+				PublicIP: "foo",
 				State:    StateRunnable,
 			},
 		},

@@ -140,7 +140,12 @@ func (h *localHandler) updateConnectionSecret(ctx context.Context) (*corev1.Secr
 		if _, found := s.Data[runtimev1alpha1.ResourceCredentialsSecretPasswordKey]; !found {
 			s.Data[runtimev1alpha1.ResourceCredentialsSecretPasswordKey] = []byte(password)
 		}
-		s.Data[runtimev1alpha1.ResourceCredentialsSecretEndpointKey] = secret.Data[runtimev1alpha1.ResourceCredentialsSecretEndpointKey]
+		if _, found := secret.Data[v1alpha1.PrivateIPKey]; found {
+			s.Data[v1alpha1.PrivateIPKey] = secret.Data[v1alpha1.PrivateIPKey]
+		}
+		if _, found := secret.Data[v1alpha1.PublicIPKey]; found {
+			s.Data[v1alpha1.PublicIPKey] = secret.Data[v1alpha1.PublicIPKey]
+		}
 		s.Data[runtimev1alpha1.ResourceCredentialsSecretUserKey] = secret.Data[runtimev1alpha1.ResourceCredentialsSecretUserKey]
 		return nil
 	}); err != nil {

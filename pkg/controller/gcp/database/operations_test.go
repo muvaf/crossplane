@@ -44,7 +44,7 @@ var (
 
 	testKey = types.NamespacedName{Namespace: testNs, Name: testName}
 
-	testSecret = func(ep, pw string) *core.Secret {
+	testSecret = func(privateIP, publicIP, pw string) *core.Secret {
 		t := true
 		return &core.Secret{
 			ObjectMeta: meta1.ObjectMeta{
@@ -61,7 +61,8 @@ var (
 				},
 			},
 			Data: map[string][]byte{
-				runtimev1alpha1.ResourceCredentialsSecretEndpointKey: []byte(ep),
+				v1alpha1.PrivateIPKey: []byte(privateIP),
+				v1alpha1.PublicIPKey:  []byte(publicIP),
 				runtimev1alpha1.ResourceCredentialsSecretPasswordKey: []byte(pw),
 				runtimev1alpha1.ResourceCredentialsSecretUserKey:     []byte(v1alpha1.MysqlDefaultUser),
 			},
@@ -815,7 +816,7 @@ func Test_localHandler_updateConnectionSecret(t *testing.T) {
 				},
 			},
 			want: want{
-				sec: testSecret("", ""),
+				sec: testSecret("", "", ""),
 			},
 		},
 		"ExistsButBelongsToAnother": {
@@ -827,14 +828,14 @@ func Test_localHandler_updateConnectionSecret(t *testing.T) {
 							withWriteConnectionSecretRef(core.LocalObjectReference{Name: testName}).build(),
 					},
 					Status: v1alpha1.CloudsqlInstanceStatus{
-						Endpoint: "new-ep",
+						PublicIP: "new-ep",
 					},
 				},
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj runtime.Object) error {
 						assertKey(key)
 						s := assertObj(obj)
-						ts := testSecret("test-ep", "test-pass")
+						ts := testSecret("test-priv", "test-pub", "test-pass")
 						ts.OwnerReferences[0].UID = "foo"
 						ts.DeepCopyInto(s)
 						return nil
@@ -847,7 +848,7 @@ func Test_localHandler_updateConnectionSecret(t *testing.T) {
 					"could not mutate object for update"),
 			},
 		},
-		"ExistsUpdateEndpoint": {
+		"ExistsUpdateIPAddresses": {
 			fields: fields{
 				inst: &v1alpha1.CloudsqlInstance{
 					ObjectMeta: testMeta,
@@ -856,14 +857,15 @@ func Test_localHandler_updateConnectionSecret(t *testing.T) {
 							withWriteConnectionSecretRef(core.LocalObjectReference{Name: testName}).build(),
 					},
 					Status: v1alpha1.CloudsqlInstanceStatus{
-						Endpoint: "new-ep",
+						PublicIP:  "new-test-pub",
+						PrivateIP: "new-test-priv",
 					},
 				},
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj runtime.Object) error {
 						assertKey(key)
 						s := assertObj(obj)
-						ts := testSecret("test-ep", "test-pass")
+						ts := testSecret("test-priv", "test-pub", "test-pass")
 						ts.DeepCopyInto(s)
 						return nil
 					},
@@ -874,7 +876,7 @@ func Test_localHandler_updateConnectionSecret(t *testing.T) {
 				},
 			},
 			want: want{
-				sec: testSecret("new-ep", "test-pass"),
+				sec: testSecret("new-test-priv", "new-test-pub", "test-pass"),
 			},
 		},
 	}
@@ -939,7 +941,10 @@ func Test_managedHandler_getInstance(t *testing.T) {
 						}
 						return &sqladmin.DatabaseInstance{
 							IpAddresses: []*sqladmin.IpMapping{
-								{IpAddress: "test.ip.address"},
+								{
+									IpAddress: "test.ip.address",
+									Type:      v1alpha1.PublicIPType,
+								},
 							},
 							State: "thinking-about",
 						}, nil
@@ -949,7 +954,7 @@ func Test_managedHandler_getInstance(t *testing.T) {
 			want: want{
 				status: v1alpha1.CloudsqlInstanceStatus{
 					State:          "thinking-about",
-					Endpoint:       "test.ip.address",
+					PublicIP:       "test.ip.address",
 					ResourceStatus: *newInstanceStatus().withConditions(runtimev1alpha1.Unavailable()).build(),
 				},
 			},
@@ -1255,7 +1260,7 @@ func Test_managedHandler_updateUserCreds(t *testing.T) {
 				obj: &v1alpha1.CloudsqlInstance{},
 				ops: &mockLocalOperations{
 					mockUpdateConnectionSecret: func(ctx context.Context) (*core.Secret, error) {
-						return testSecret("foo", "bar"), nil
+						return testSecret("foo", "foobar", "bar"), nil
 					},
 				},
 				user: &fake.MockUserClient{
@@ -1271,7 +1276,7 @@ func Test_managedHandler_updateUserCreds(t *testing.T) {
 				obj: &v1alpha1.CloudsqlInstance{},
 				ops: &mockLocalOperations{
 					mockUpdateConnectionSecret: func(ctx context.Context) (*core.Secret, error) {
-						return testSecret("new-endpoint", "new-password"), nil
+						return testSecret("new-private", "new-public", "new-password"), nil
 					},
 				},
 				user: &fake.MockUserClient{

@@ -257,7 +257,11 @@ spec:
                 - type
                 type: object
               type: array
-            endpoint:
+            privateIp:
+              type: string
+            publicIp:
+              description: 'TODO(muvaf): Convert these types to *string during managed
+                reconciler refactor because both are optional.'
               type: string
             state:
               type: string
