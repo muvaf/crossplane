@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	runtimev1alpha1 "github.com/crossplane/crossplane-runtime/apis/core/v1alpha1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -38,6 +39,7 @@ import (
 // Observation is the result of composed reconciliation.
 type Observation struct {
 	Ref               v1.ObjectReference
+	ReadyCondition    runtimev1alpha1.Condition
 	ConnectionDetails managed.ConnectionDetails
 }
 
@@ -96,6 +98,7 @@ func (r *APIComposedReconciler) Reconcile(ctx context.Context, cr resource.Compo
 		return Observation{}, err
 	}
 	obs.Ref = *meta.ReferenceTo(composed, composed.GetObjectKind().GroupVersionKind())
+	obs.ReadyCondition = composed.GetCondition(runtimev1alpha1.TypeReady)
 
 	conn, err := r.GetConnectionDetails(ctx, composed, tmpl.ConnectionDetails)
 	if err != nil {

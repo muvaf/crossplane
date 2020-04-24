@@ -154,11 +154,16 @@ func (r *compositeReconciler) Reconcile(req reconcile.Request) (reconcile.Result
 	refs := make([]v1.ObjectReference, len(comp.Spec.To))
 	copy(refs, cr.GetResourceReferences())
 	conn := managed.ConnectionDetails{}
+	isReady := true
 	for i, composedRef := range refs {
 		obs, err := r.composed.Reconcile(ctx, cr, composedRef, comp.Spec.To[i])
 		if err != nil {
 			cr.SetConditions(runtimev1alpha1.ReconcileError(errors.Wrap(err, "cannot reconcile composed resource")))
 			return reconcile.Result{RequeueAfter: shortWait}, errors.Wrap(r.client.Status().Update(ctx, cr), errUpdateCompositeStatus)
+		}
+		if !resource.IsConditionTrue(obs.ReadyCondition) {
+			cr.SetConditions(obs.ReadyCondition)
+			isReady = false
 		}
 		refs[i] = obs.Ref
 		cr.SetResourceReferences(refs)
@@ -169,6 +174,9 @@ func (r *compositeReconciler) Reconcile(req reconcile.Request) (reconcile.Result
 		for key, val := range obs.ConnectionDetails {
 			conn[key] = val
 		}
+	}
+	if isReady {
+		cr.SetConditions(runtimev1alpha1.Available())
 	}
 
 	if err := r.connection.PublishConnection(ctx, cr, conn); err != nil {
