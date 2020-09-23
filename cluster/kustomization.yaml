@@ -3,7 +3,6 @@
 resources:
 - charts/crossplane/crds/apiextensions.crossplane.io_compositeresourcedefinitions.yaml
 - charts/crossplane/crds/apiextensions.crossplane.io_compositions.yaml
-- charts/crossplane/crds/kubernetes.crossplane.io_providers.yaml
 - charts/crossplane/crds/pkg.crossplane.io_configurationrevisions.yaml
 - charts/crossplane/crds/pkg.crossplane.io_configurations.yaml
 - charts/crossplane/crds/pkg.crossplane.io_providerrevisions.yaml
