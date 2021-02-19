@@ -5,7 +5,7 @@
 Let's list all the known issues that can be solved by using webhooks and with which operation type.
 
 * Conversion webhooks for version changes in CRDs #1584
-  * Mutation in `CREATE`, `UPDATE` operation of **all kinds**
+  * Conversion operation for **all kinds**
 * Validate composition base templates #1476
   * Validation in `CREATE` operation of `Composition`
 * Validate schemas in XRD #1752
@@ -69,7 +69,7 @@ type Validator interface {
 }
 ```
 
-We see that the interfaces include `runtime.Object`, which means the functions need to be members of the kinds, i.e. `RDSInstance` struct needs to implements these functions. The abstraction layer that accepts these interfaces look pretty similar so I'll copy only the mutation one:
+We see that the interfaces include `runtime.Object`, which means the functions need to be members of the kinds, i.e. `RDSInstance` struct needs to implements these functions. The abstraction layer that accepts these interfaces look pretty similar so I'll copy only the [mutation one](https://github.com/kubernetes-sigs/controller-runtime/blob/0208f43/pkg/webhook/admission/defaulter.go#L54):
 
 ```golang
 // Handle handles admission requests.
@@ -99,9 +99,13 @@ func (h *mutatingHandler) Handle(ctx context.Context, req Request) Response {
 
 This high level abstraction layer doesn't really work for us because:
 * It requires implementation in API type packages but conversion logic for a managed resource CRD will likely need to import provider SDK, which is something we don't want to do because it forces external users of API types to import them as well.
-* `Default` is not a well-suited name for our conversion operation.
+* `Default` is not a well-suited name for our conversion operation, or any mutation operation we expect to do since we'll use the kubebuilder [`default` marker](https://book.kubebuilder.io/reference/markers/crd-validation.html) for this functionality.
 
 On the other hand, while the low level one would work, we never really need to customize encoder/decoders and deal with `http.Handler` interface. The following section proposes an abstraction layer built on top of this lower level one.
 
 ### Proposed Abstraction
 
+We want to provide an abstraction at a level similar to the high level one from `controller-runtime`, excluding the parts that don't work for us. The following will be the interface that will be required from every kind that wants to implement a conversion webhook:
+```golang
+func Mutate(ctx context.Context, old resource.Managed, new resource.Managed) error
+```
