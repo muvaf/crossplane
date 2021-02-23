@@ -38,20 +38,20 @@ levels.
 Let's list all the known issues that can be solved by using webhooks and with
 which operation type.
 
-* Conversion webhooks for version changes in CRDs #1584
+* Conversion webhooks for version changes in CRDs [#1584](https://github.com/crossplane/crossplane/issues/1584)
   * Conversion operation for **all kinds**
-* Validate composition base templates #1476
+* Validate composition base templates [#1476](https://github.com/crossplane/crossplane/issues/1476)
   * Validation in `CREATE` operation of `Composition`
-* Validate schemas in XRD #1752
+* Validate schemas in XRD [#1752](https://github.com/crossplane/crossplane/issues/1752)
   * Validation in `CREATE` operation of `CompositeResourceDefinition`
-* Immutable resource fields #727
+* Immutable resource fields [#727](https://github.com/crossplane/crossplane/issues/727)
   * Validation in `UPDATE` operation of **every managed resource**
   * The semantics in the KEP covering this is `can-be-set-only-in-creation`
     while what we want `cannot-be-changed-once-set`. So we can't really use
     upstream impl. when it's implemented.
-* Composition scheduling #967
+* Composition scheduling [#967](https://github.com/crossplane/crossplane/issues/967)
   * Mutation in `CREATE` operation of `Composition`
-* Support `oneOf` semantics validation for discriminator fields #950
+* Support `oneOf` semantics validation for discriminator fields [#950](https://github.com/crossplane/crossplane/issues/950)
   * Implemented in Kubernetes, coming to controller-runtime.
 
 ## Implementation Requirements
