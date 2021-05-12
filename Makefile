@@ -58,7 +58,7 @@ HELM_CHART_LINT_ARGS_crossplane = --set nameOverride='',imagePullSecrets=''
 # all be in folders at the same level (no additional levels of nesting).
 
 DOCKER_REGISTRY = crossplane
-IMAGES = crossplane
+IMAGES = crossplane crossplane-ubi
 OSBASEIMAGE = gcr.io/distroless/static:nonroot
 -include build/makelib/image.mk
 
